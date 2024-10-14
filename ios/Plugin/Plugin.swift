@@ -7,22 +7,29 @@ import CoreBluetooth
 let CONNECTION_TIMEOUT: Double = 10
 let DEFAULT_TIMEOUT: Double = 5
 
+fileprivate struct SharedBLEVariables {
+  static var deviceManager: DeviceManager?
+  static var deviceMap = [String: Device]()
+  static var displayStrings = [String: String]()
+}
+
 @objc(BluetoothLe)
 public class BluetoothLe: CAPPlugin {
     typealias BleDevice = [String: Any]
     typealias BleService = [String: Any]
     typealias BleCharacteristic = [String: Any]
     typealias BleDescriptor = [String: Any]
-    private var deviceManager: DeviceManager?
-    private var deviceMap = [String: Device]()
-    private var displayStrings = [String: String]()
 
     override public func load() {
-        self.displayStrings = self.getDisplayStrings()
+        SharedBLEVariables.displayStrings = self.getDisplayStrings()
     }
 
     @objc func initialize(_ call: CAPPluginCall) {
-        self.deviceManager = DeviceManager(self.bridge?.viewController, self.displayStrings, {(success, message) in
+        if SharedBLEVariables.deviceManager != nil {
+          call.resolve()
+          return
+        }
+        SharedBLEVariables.deviceManager = DeviceManager(self.bridge?.viewController, SharedBLEVariables.displayStrings, {(success, message) -> Void in
             if success {
                 call.resolve()
             } else {
@@ -51,7 +58,7 @@ public class BluetoothLe: CAPPlugin {
 
     @objc func startEnabledNotifications(_ call: CAPPluginCall) {
         guard let deviceManager = self.getDeviceManager(call) else { return }
-        deviceManager.registerStateReceiver({(enabled) in
+        deviceManager.registerStateReceiver({(enabled) -> Void in
             self.notifyListeners("onEnabledChanged", data: ["value": enabled])
         })
         call.resolve()
@@ -97,7 +104,7 @@ public class BluetoothLe: CAPPlugin {
     @objc func setDisplayStrings(_ call: CAPPluginCall) {
         for key in ["noDeviceFound", "availableDevices", "scanning", "cancel"] {
             if call.getString(key) != nil {
-                self.displayStrings[key] = call.getString(key)
+                SharedBLEVariables.displayStrings[key] = call.getString(key)
             }
         }
         call.resolve()
@@ -105,7 +112,7 @@ public class BluetoothLe: CAPPlugin {
 
     @objc func requestDevice(_ call: CAPPluginCall) {
         guard let deviceManager = self.getDeviceManager(call) else { return }
-        deviceManager.setDisplayStrings(self.displayStrings)
+        deviceManager.setDisplayStrings(SharedBLEVariables.displayStrings)
 
         let serviceUUIDs = self.getServiceUUIDs(call)
         let name = call.getString("name")
@@ -117,20 +124,20 @@ public class BluetoothLe: CAPPlugin {
             namePrefix,
             false,
             true,
-            30, {(success, message) in
+            30, {(success, message) -> Void in
                 // selected a device
                 if success {
                     guard let device = deviceManager.getDevice(message) else {
                         call.reject("Device not found.")
                         return
                     }
-                    self.deviceMap[device.getId()] = device
+                    SharedBLEVariables.deviceMap[device.getId()] = device
                     let bleDevice: BleDevice = self.getBleDevice(device)
                     call.resolve(bleDevice)
                 } else {
                     call.reject(message)
                 }
-            }, {(_, _, _) in
+            }, {(_, _, _) -> Void in
 
             }
         )
@@ -150,14 +157,14 @@ public class BluetoothLe: CAPPlugin {
             namePrefix,
             allowDuplicates,
             false,
-            nil, {(success, message) in
+            nil, {(success, message) -> Void in
                 if success {
                     call.resolve()
                 } else {
                     call.reject(message)
                 }
-            }, {(device, advertisementData, rssi) in
-                self.deviceMap[device.getId()] = device
+            }, {(device, advertisementData, rssi) -> Void in
+                SharedBLEVariables.deviceMap[device.getId()] = device
                 let data = self.getScanResult(device, advertisementData, rssi)
                 self.notifyListeners("onScanResult", data: data)
             }
@@ -182,9 +189,9 @@ public class BluetoothLe: CAPPlugin {
         let peripherals = deviceManager.getDevices(deviceUUIDs)
         let bleDevices: [BleDevice] = peripherals.map({peripheral in
             let deviceId = peripheral.identifier.uuidString
-            guard let device = self.deviceMap[deviceId] else {
+            guard let device = SharedBLEVariables.deviceMap[deviceId] else {
                 let newDevice = Device(peripheral)
-                self.deviceMap[newDevice.getId()] = newDevice
+                SharedBLEVariables.deviceMap[newDevice.getId()] = newDevice
                 return self.getBleDevice(newDevice)
             }
             return self.getBleDevice(device)
@@ -204,9 +211,9 @@ public class BluetoothLe: CAPPlugin {
         let peripherals = deviceManager.getConnectedDevices(serviceUUIDs)
         let bleDevices: [BleDevice] = peripherals.map({peripheral in
             let deviceId = peripheral.identifier.uuidString
-            guard let device = self.deviceMap[deviceId] else {
+            guard let device = SharedBLEVariables.deviceMap[deviceId] else {
                 let newDevice = Device(peripheral)
-                self.deviceMap[newDevice.getId()] = newDevice
+                SharedBLEVariables.deviceMap[newDevice.getId()] = newDevice
                 return self.getBleDevice(newDevice)
             }
             return self.getBleDevice(device)
@@ -218,7 +225,7 @@ public class BluetoothLe: CAPPlugin {
         guard self.getDeviceManager(call) != nil else { return }
         guard let device = self.getDevice(call, checkConnection: false) else { return }
         let timeout = self.getTimeout(call, defaultTimeout: CONNECTION_TIMEOUT)
-        device.setOnConnected(timeout, {(success, message) in
+        device.setOnConnected(timeout, {(success, message) -> Void in
             if success {
                 // only resolve after service discovery
                 call.resolve()
@@ -226,11 +233,11 @@ public class BluetoothLe: CAPPlugin {
                 call.reject(message)
             }
         })
-        self.deviceManager?.setOnDisconnected(device, {(_, _) in
+        SharedBLEVariables.deviceManager?.setOnDisconnected(device, {(_, _) -> Void in
             let key = "disconnected|\(device.getId())"
             self.notifyListeners(key, data: nil)
         })
-        self.deviceManager?.connect(device, timeout, {(success, message) in
+        SharedBLEVariables.deviceManager?.connect(device, timeout, {(success, message) -> Void in
             if success {
                 log("Connected to peripheral. Waiting for service discovery.")
             } else {
@@ -252,7 +259,7 @@ public class BluetoothLe: CAPPlugin {
         guard self.getDeviceManager(call) != nil else { return }
         guard let device = self.getDevice(call, checkConnection: false) else { return }
         let timeout = self.getTimeout(call)
-        self.deviceManager?.disconnect(device, timeout, {(success, message) in
+        SharedBLEVariables.deviceManager?.disconnect(device, timeout, {(success, message) -> Void in
             if success {
                 call.resolve()
             } else {
@@ -308,7 +315,7 @@ public class BluetoothLe: CAPPlugin {
         guard self.getDeviceManager(call) != nil else { return }
         guard let device = self.getDevice(call) else { return }
         let timeout = self.getTimeout(call)
-        device.discoverServices(timeout, {(success, value) in
+        device.discoverServices(timeout, {(success, value) -> Void in
             if success {
                 call.resolve()
             } else {
@@ -333,7 +340,7 @@ public class BluetoothLe: CAPPlugin {
         guard self.getDeviceManager(call) != nil else { return }
         guard let device = self.getDevice(call) else { return }
         let timeout = self.getTimeout(call)
-        device.readRssi(timeout, {(success, value) in
+        device.readRssi(timeout, {(success, value) -> Void in
             if success {
                 call.resolve([
                     "value": value
@@ -349,7 +356,7 @@ public class BluetoothLe: CAPPlugin {
         guard let device = self.getDevice(call) else { return }
         guard let characteristic = self.getCharacteristic(call) else { return }
         let timeout = self.getTimeout(call)
-        device.read(characteristic.0, characteristic.1, timeout, {(success, value) in
+        device.read(characteristic.0, characteristic.1, timeout, {(success, value) -> Void in
             if success {
                 call.resolve([
                     "value": value
@@ -375,7 +382,7 @@ public class BluetoothLe: CAPPlugin {
             characteristic.1,
             value,
             writeType,
-            timeout, {(success, value) in
+            timeout, {(success, value) -> Void in
                 if success {
                     call.resolve()
                 } else {
@@ -399,7 +406,7 @@ public class BluetoothLe: CAPPlugin {
             characteristic.1,
             value,
             writeType,
-            timeout, {(success, value) in
+            timeout, {(success, value) -> Void in
                 if success {
                     call.resolve()
                 } else {
@@ -417,7 +424,7 @@ public class BluetoothLe: CAPPlugin {
             descriptor.0,
             descriptor.1,
             descriptor.2,
-            timeout, {(success, value) in
+            timeout, {(success, value) -> Void in
                 if success {
                     call.resolve([
                         "value": value
@@ -442,7 +449,7 @@ public class BluetoothLe: CAPPlugin {
             descriptor.1,
             descriptor.2,
             value,
-            timeout, {(success, value) in
+            timeout, {(success, value) -> Void in
                 if success {
                     call.resolve()
                 } else {
@@ -459,11 +466,11 @@ public class BluetoothLe: CAPPlugin {
         device.setNotifications(
             characteristic.0,
             characteristic.1,
-            true, {(_, value) in
+            true, {(_, value) -> Void in
                 let key = "notification|\(device.getId())|\(characteristic.0.uuidString.lowercased())|\(characteristic.1.uuidString.lowercased())"
                 self.notifyListeners(key, data: ["value": value])
             },
-            timeout, {(success, value) in
+            timeout, {(success, value) -> Void in
                 if success {
                     call.resolve()
                 } else {
@@ -482,7 +489,7 @@ public class BluetoothLe: CAPPlugin {
             characteristic.1,
             false,
             nil,
-            timeout, {(success, value) in
+            timeout, {(success, value) -> Void in
                 if success {
                     call.resolve()
                 } else {
@@ -502,7 +509,7 @@ public class BluetoothLe: CAPPlugin {
     }
 
     private func getDeviceManager(_ call: CAPPluginCall) -> DeviceManager? {
-        guard let deviceManager = self.deviceManager else {
+        guard let deviceManager = SharedBLEVariables.deviceManager else {
             call.reject("Bluetooth LE not initialized.")
             return nil
         }
@@ -522,7 +529,7 @@ public class BluetoothLe: CAPPlugin {
             call.reject("deviceId required.")
             return nil
         }
-        guard let device = self.deviceMap[deviceId] else {
+        guard let device = SharedBLEVariables.deviceMap[deviceId] else {
             call.reject("Device not found. Call 'requestDevice', 'requestLEScan' or 'getDevices' first.")
             return nil
         }
