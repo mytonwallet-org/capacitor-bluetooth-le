@@ -6,14 +6,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/maintenance/yes/2024?style=flat-square" />
+  <img src="https://img.shields.io/maintenance/yes/2025?style=flat-square" />
   <a href="https://github.com/capacitor-community/bluetooth-le/actions?query=workflow%3A%22CI%22"><img src="https://img.shields.io/github/actions/workflow/status/capacitor-community/bluetooth-le/main.yml?branch=main&style=flat-square" /></a>
   <a href="https://www.npmjs.com/package/@capacitor-community/bluetooth-le"><img src="https://img.shields.io/npm/l/@capacitor-community/bluetooth-le?style=flat-square" /></a>
 <br>
   <a href="https://www.npmjs.com/package/@capacitor-community/bluetooth-le"><img src="https://img.shields.io/npm/dw/@capacitor-community/bluetooth-le?style=flat-square" /></a>
   <a href="https://www.npmjs.com/package/@capacitor-community/bluetooth-le"><img src="https://img.shields.io/npm/v/@capacitor-community/bluetooth-le?style=flat-square" /></a>
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-<a href="#contributors-"><img src="https://img.shields.io/badge/all%20contributors-18-orange?style=flat-square" /></a>
+<a href="#contributors-"><img src="https://img.shields.io/badge/all%20contributors-20-orange?style=flat-square" /></a>
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </p>
 
@@ -28,7 +28,8 @@
 
 | Plugin | Capacitor | Documentation                                                                     |
 | ------ | --------- | --------------------------------------------------------------------------------- |
-| 6.x    | 6.x       | [README](https://github.com/capacitor-community/bluetooth-le/blob/main/README.md) |
+| 7.x    | 7.x       | [README](https://github.com/capacitor-community/bluetooth-le/blob/main/README.md) |
+| 6.x    | 6.x       | [README](https://github.com/capacitor-community/bluetooth-le/blob/6.x/README.md)  |
 | 3.x    | 5.x       | [README](https://github.com/capacitor-community/bluetooth-le/blob/3.x/README.md)  |
 | 2.x    | 4.x       | [README](https://github.com/capacitor-community/bluetooth-le/blob/2.x/README.md)  |
 | 1.x    | 3.x       | [README](https://github.com/capacitor-community/bluetooth-le/blob/1.x/README.md)  |
@@ -69,6 +70,7 @@ Below is an index of all the methods available.
 - [`requestLEScan(...)`](#requestlescan)
 - [`stopLEScan()`](#stoplescan)
 - [`getDevices(...)`](#getdevices)
+- [`getBondedDevices()`](#getbondeddevices)
 - [`getConnectedDevices(...)`](#getconnecteddevices)
 - [`connect(...)`](#connect)
 - [`createBond(...)`](#createbond)
@@ -252,7 +254,7 @@ export async function main(): Promise<void> {
       HEART_RATE_MEASUREMENT_CHARACTERISTIC,
       (value) => {
         console.log('current heart rate', parseHeartRate(value));
-      }
+      },
     );
 
     // disconnect after 10 sec
@@ -302,7 +304,7 @@ export async function scan(): Promise<void> {
       },
       (result) => {
         console.log('received new scan result', result);
-      }
+      },
     );
 
     setTimeout(async () => {
@@ -343,6 +345,7 @@ _Note_: web support depends on the browser, see [implementation status](https://
 | [`requestLEScan(...)`](#requestlescan)                         |   ✅    | ✅  | 🚩  |
 | [`stopLEScan()`](#stoplescan)                                  |   ✅    | ✅  | 🚩  |
 | [`getDevices(...)`](#getdevices)                               |   ✅    | ✅  | 🚩  |
+| [`getBondedDevices(...)`](#getbondeddevices)                   |   ✅    | ❌  | ❌  |
 | [`getConnectedDevices(...)`](#getconnecteddevices)             |   ✅    | ✅  | 🚩  |
 | [`connect(...)`](#connect)                                     |   ✅    | ✅  | ✅  |
 | [`createBond(...)`](#createbond)                               |   ✅    | ❌  | ❌  |
@@ -583,6 +586,20 @@ On Android, you can directly connect to the device with the deviceId.
 | Param           | Type                  | Description                                             |
 | --------------- | --------------------- | ------------------------------------------------------- |
 | **`deviceIds`** | <code>string[]</code> | List of device IDs, e.g. saved from a previous app run. |
+
+**Returns:** <code>Promise&lt;BleDevice[]&gt;</code>
+
+---
+
+### getBondedDevices()
+
+```typescript
+getBondedDevices() => Promise<BleDevice[]>
+```
+
+Get a list of currently bonded devices.
+Only available on **Android**.
+Uses [getBondedDevices](<https://developer.android.com/reference/android/bluetooth/BluetoothAdapter#getBondedDevices()>) on Android
 
 **Returns:** <code>Promise&lt;BleDevice[]&gt;</code>
 
@@ -1072,7 +1089,7 @@ On Android, the `initialize` call requests the location permission. However, if 
 ```typescript
 async function initialize() {
   // Check if location is enabled
-  if (this.platform.is('android')) {
+  if (Capacitor.getPlatform() === 'android') {
     const isLocationEnabled = await BleClient.isLocationEnabled();
     if (!isLocationEnabled) {
       await BleClient.openLocationSettings();
@@ -1114,6 +1131,8 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/OpenSrcerer"><img src="https://avatars.githubusercontent.com/u/46500918?v=4?s=100" width="100px;" alt="Daniel Stefani"/><br /><sub><b>Daniel Stefani</b></sub></a><br /><a href="https://github.com/capacitor-community/bluetooth-le/commits?author=OpenSrcerer" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/lhd-biosency"><img src="https://avatars.githubusercontent.com/u/71714070?v=4?s=100" width="100px;" alt="Laurent"/><br /><sub><b>Laurent</b></sub></a><br /><a href="https://github.com/capacitor-community/bluetooth-le/commits?author=lhd-biosency" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/peitschie"><img src="https://avatars.githubusercontent.com/u/1052079?v=4?s=100" width="100px;" alt="Philip Peitsch"/><br /><sub><b>Philip Peitsch</b></sub></a><br /><a href="https://github.com/capacitor-community/bluetooth-le/commits?author=peitschie" title="Code">💻</a> <a href="#question-peitschie" title="Answering Questions">💬</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/NaterGator"><img src="https://avatars.githubusercontent.com/u/2575?v=4?s=100" width="100px;" alt="Nate Weibley"/><br /><sub><b>Nate Weibley</b></sub></a><br /><a href="https://github.com/capacitor-community/bluetooth-le/commits?author=NaterGator" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="http://www.enesi.it"><img src="https://avatars.githubusercontent.com/u/2611534?v=4?s=100" width="100px;" alt="Emanuele Toffolon"/><br /><sub><b>Emanuele Toffolon</b></sub></a><br /><a href="https://github.com/capacitor-community/bluetooth-le/commits?author=emanueletoffolon" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

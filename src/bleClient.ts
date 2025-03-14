@@ -130,6 +130,13 @@ export interface BleClientInterface {
   getDevices(deviceIds: string[]): Promise<BleDevice[]>;
 
   /**
+   * Get a list of currently bonded devices.
+   * Only available on **Android**.
+   * Uses [getBondedDevices](https://developer.android.com/reference/android/bluetooth/BluetoothAdapter#getBondedDevices()) on Android
+   */
+  getBondedDevices(): Promise<BleDevice[]>;
+
+  /**
    * Get a list of currently connected devices.
    * Uses [retrieveConnectedPeripherals](https://developer.apple.com/documentation/corebluetooth/cbcentralmanager/1518924-retrieveconnectedperipherals) on iOS,
    * [getConnectedDevices](https://developer.android.com/reference/android/bluetooth/BluetoothManager#getConnectedDevices(int)) on Android
@@ -226,7 +233,7 @@ export interface BleClientInterface {
     service: string,
     characteristic: string,
     value: DataView,
-    options?: TimeoutOptions
+    options?: TimeoutOptions,
   ): Promise<void>;
 
   /**
@@ -242,7 +249,7 @@ export interface BleClientInterface {
     service: string,
     characteristic: string,
     value: DataView,
-    options?: TimeoutOptions
+    options?: TimeoutOptions,
   ): Promise<void>;
 
   /**
@@ -258,7 +265,7 @@ export interface BleClientInterface {
     service: string,
     characteristic: string,
     descriptor: string,
-    options?: TimeoutOptions
+    options?: TimeoutOptions,
   ): Promise<DataView>;
 
   /**
@@ -276,7 +283,7 @@ export interface BleClientInterface {
     characteristic: string,
     descriptor: string,
     value: DataView,
-    options?: TimeoutOptions
+    options?: TimeoutOptions,
   ): Promise<void>;
 
   /**
@@ -293,7 +300,7 @@ export interface BleClientInterface {
     deviceId: string,
     service: string,
     characteristic: string,
-    callback: (value: DataView) => void
+    callback: (value: DataView) => void,
   ): Promise<void>;
 
   /**
@@ -460,6 +467,13 @@ class BleClientClass implements BleClientInterface {
     });
   }
 
+  async getBondedDevices(): Promise<BleDevice[]> {
+    return this.queue(async () => {
+      const result = await BluetoothLe.getBondedDevices();
+      return result.devices;
+    });
+  }
+
   async connect(deviceId: string, onDisconnect?: (deviceId: string) => void, options?: TimeoutOptions): Promise<void> {
     await this.queue(async () => {
       if (onDisconnect) {
@@ -550,7 +564,7 @@ class BleClientClass implements BleClientInterface {
     service: string,
     characteristic: string,
     value: DataView,
-    options?: TimeoutOptions
+    options?: TimeoutOptions,
   ): Promise<void> {
     service = parseUUID(service);
     characteristic = parseUUID(characteristic);
@@ -578,7 +592,7 @@ class BleClientClass implements BleClientInterface {
     service: string,
     characteristic: string,
     value: DataView,
-    options?: TimeoutOptions
+    options?: TimeoutOptions,
   ): Promise<void> {
     service = parseUUID(service);
     characteristic = parseUUID(characteristic);
@@ -606,7 +620,7 @@ class BleClientClass implements BleClientInterface {
     service: string,
     characteristic: string,
     descriptor: string,
-    options?: TimeoutOptions
+    options?: TimeoutOptions,
   ): Promise<DataView> {
     service = parseUUID(service);
     characteristic = parseUUID(characteristic);
@@ -630,7 +644,7 @@ class BleClientClass implements BleClientInterface {
     characteristic: string,
     descriptor: string,
     value: DataView,
-    options?: TimeoutOptions
+    options?: TimeoutOptions,
   ): Promise<void> {
     service = parseUUID(service);
     characteristic = parseUUID(characteristic);
@@ -659,7 +673,7 @@ class BleClientClass implements BleClientInterface {
     deviceId: string,
     service: string,
     characteristic: string,
-    callback: (value: DataView) => void
+    callback: (value: DataView) => void,
   ): Promise<void> {
     service = parseUUID(service);
     characteristic = parseUUID(characteristic);

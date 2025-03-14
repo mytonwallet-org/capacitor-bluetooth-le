@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.0.0](https://github.com/capacitor-community/bluetooth-le/compare/v6.1.0...v7.0.0) (2025-01-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* update plugin to capacitor 7 (#744)
+
+### Features
+
+* update plugin to capacitor 7 ([#744](https://github.com/capacitor-community/bluetooth-le/issues/744)) ([cc1c447](https://github.com/capacitor-community/bluetooth-le/commit/cc1c4478b8e547e57b18cf24a660c2d39a64da38))
+
+
+### Bug Fixes
+
+* **ios:** replace deprecated getConfigValue ([f9775a9](https://github.com/capacitor-community/bluetooth-le/commit/f9775a98f5e110a9afa567649bea53eff0cc134c))
+* make format of internal hex strings consistent ([3ec8a98](https://github.com/capacitor-community/bluetooth-le/commit/3ec8a98741ca8f29d975b7c20430d697cd2e97ac))
+
+## [6.1.0](https://github.com/capacitor-community/bluetooth-le/compare/v6.0.2...v6.1.0) (2024-11-21)
+
+
+### Features
+
+* **android:** Add getBondedDevices method to retrieve bonded devices on Android ([#716](https://github.com/capacitor-community/bluetooth-le/issues/716)) ([91a4d00](https://github.com/capacitor-community/bluetooth-le/commit/91a4d0089d4a3125987cc5d4cb0934bb7c004ffd))
+
+### [6.0.2](https://github.com/capacitor-community/bluetooth-le/compare/v6.0.1...v6.0.2) (2024-11-03)
+
+### Features
+
+* improve byte to hex string conversion optimizations ([#701](https://github.com/capacitor-community/bluetooth-le/issues/701)) ([e064587](https://github.com/capacitor-community/bluetooth-le/commit/e064587a7fd55891ec2b4bf1440b9c8d792cc182))
+
 ### [6.0.1](https://github.com/capacitor-community/bluetooth-le/compare/v6.0.0...v6.0.1) (2024-07-22)
 
 
