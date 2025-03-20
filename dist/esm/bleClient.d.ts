@@ -95,6 +95,12 @@ export interface BleClientInterface {
      */
     getDevices(deviceIds: string[]): Promise<BleDevice[]>;
     /**
+     * Get a list of currently bonded devices.
+     * Only available on **Android**.
+     * Uses [getBondedDevices](https://developer.android.com/reference/android/bluetooth/BluetoothAdapter#getBondedDevices()) on Android
+     */
+    getBondedDevices(): Promise<BleDevice[]>;
+    /**
      * Get a list of currently connected devices.
      * Uses [retrieveConnectedPeripherals](https://developer.apple.com/documentation/corebluetooth/cbcentralmanager/1518924-retrieveconnectedperipherals) on iOS,
      * [getConnectedDevices](https://developer.android.com/reference/android/bluetooth/BluetoothManager#getConnectedDevices(int)) on Android
@@ -246,6 +252,7 @@ declare class BleClientClass implements BleClientInterface {
     stopLEScan(): Promise<void>;
     getDevices(deviceIds: string[]): Promise<BleDevice[]>;
     getConnectedDevices(services: string[]): Promise<BleDevice[]>;
+    getBondedDevices(): Promise<BleDevice[]>;
     connect(deviceId: string, onDisconnect?: (deviceId: string) => void, options?: TimeoutOptions): Promise<void>;
     createBond(deviceId: string, options?: TimeoutOptions): Promise<void>;
     isBonded(deviceId: string): Promise<boolean>;

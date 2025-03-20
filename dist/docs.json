@@ -258,6 +258,18 @@
         "slug": "getdevices"
       },
       {
+        "name": "getBondedDevices",
+        "signature": "() => Promise<BleDevice[]>",
+        "parameters": [],
+        "returns": "Promise<BleDevice[]>",
+        "tags": [],
+        "docs": "Get a list of currently bonded devices.\nOnly available on **Android**.\nUses [getBondedDevices](https://developer.android.com/reference/android/bluetooth/BluetoothAdapter#getBondedDevices()) on Android",
+        "complexTypes": [
+          "BleDevice"
+        ],
+        "slug": "getbondeddevices"
+      },
+      {
         "name": "getConnectedDevices",
         "signature": "(services: string[]) => Promise<BleDevice[]>",
         "parameters": [

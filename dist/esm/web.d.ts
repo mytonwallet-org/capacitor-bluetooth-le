@@ -25,6 +25,7 @@ export declare class BluetoothLeWeb extends WebPlugin implements BluetoothLePlug
     stopLEScan(): Promise<void>;
     getDevices(options: GetDevicesOptions): Promise<GetDevicesResult>;
     getConnectedDevices(_options: GetConnectedDevicesOptions): Promise<GetDevicesResult>;
+    getBondedDevices(): Promise<GetDevicesResult>;
     connect(options: DeviceIdOptions & TimeoutOptions): Promise<void>;
     private onDisconnectedCallback;
     private onDisconnected;

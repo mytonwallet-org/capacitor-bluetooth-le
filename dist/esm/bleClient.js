@@ -139,6 +139,12 @@ class BleClientClass {
             return result.devices;
         });
     }
+    async getBondedDevices() {
+        return this.queue(async () => {
+            const result = await BluetoothLe.getBondedDevices();
+            return result.devices;
+        });
+    }
     async connect(deviceId, onDisconnect, options) {
         await this.queue(async () => {
             var _a;
