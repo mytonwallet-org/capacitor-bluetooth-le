@@ -131,6 +131,9 @@ export class BluetoothLeWeb extends WebPlugin {
         });
         return { devices: bleDevices };
     }
+    async getBondedDevices() {
+        return {};
+    }
     async connect(options) {
         var _a, _b;
         const device = this.getDeviceFromMap(options.deviceId);

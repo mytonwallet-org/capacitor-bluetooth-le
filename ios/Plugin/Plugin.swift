@@ -255,6 +255,10 @@ public class BluetoothLe: CAPPlugin {
         call.unavailable("isBonded is not available on iOS.")
     }
 
+    @objc func getBondedDevices(_ call: CAPPluginCall) {
+        call.unavailable("getBondedDevices is not available on iOS.")
+    }
+
     @objc func disconnect(_ call: CAPPluginCall) {
         guard self.getDeviceManager(call) != nil else { return }
         guard let device = self.getDevice(call, checkConnection: false) else { return }
@@ -499,7 +503,7 @@ public class BluetoothLe: CAPPlugin {
     }
 
     private func getDisplayStrings() -> [String: String] {
-        let configDisplayStrings = getConfigValue("displayStrings") as? [String: String] ?? [String: String]()
+        let configDisplayStrings = getConfig().getObject("displayStrings") as? [String: String] ?? [String: String]()
         var displayStrings = [String: String]()
         displayStrings["noDeviceFound"] = configDisplayStrings["noDeviceFound"] ?? "No device found"
         displayStrings["availableDevices"] = configDisplayStrings["availableDevices"] ?? "Available devices"

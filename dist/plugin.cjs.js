@@ -1,7 +1,5 @@
 'use strict';
 
-Object.defineProperty(exports, '__esModule', { value: true });
-
 var core = require('@capacitor/core');
 
 /**
@@ -79,13 +77,25 @@ function dataViewToText(value) {
 function numberToUUID(value) {
     return `0000${value.toString(16).padStart(4, '0')}-0000-1000-8000-00805f9b34fb`;
 }
-function hexStringToDataView(value) {
-    const numbers = value
-        .trim()
-        .split(' ')
-        .filter((e) => e !== '')
-        .map((s) => parseInt(s, 16));
-    return numbersToDataView(numbers);
+/**
+ * Convert a string of hex into a DataView of raw bytes.
+ * Note: characters other than [0-9a-fA-F] are ignored
+ * @param hex string of values, e.g. "00 01 02" or "000102"
+ * @return DataView of raw bytes
+ */
+function hexStringToDataView(hex) {
+    const bin = [];
+    let i, c, isEmpty = 1, buffer = 0;
+    for (i = 0; i < hex.length; i++) {
+        c = hex.charCodeAt(i);
+        if ((c > 47 && c < 58) || (c > 64 && c < 71) || (c > 96 && c < 103)) {
+            buffer = (buffer << 4) ^ ((c > 64 ? c + 9 : c) & 15);
+            if ((isEmpty ^= 1)) {
+                bin.push(buffer & 0xff);
+            }
+        }
+    }
+    return numbersToDataView(bin);
 }
 function dataViewToHexString(value) {
     return dataViewToNumbers(value)
@@ -96,7 +106,7 @@ function dataViewToHexString(value) {
         }
         return s;
     })
-        .join(' ');
+        .join('');
 }
 function webUUIDToString(uuid) {
     if (typeof uuid === 'string') {
@@ -197,7 +207,7 @@ class BleClientClass {
         await this.queue(async () => {
             var _a;
             const key = `onEnabledChanged`;
-            await ((_a = this.eventListeners.get(key)) === null || _a === void 0 ? void 0 : _a.remove());
+            await ((_a = this.eventListeners.get(key)) === null || _a === undefined ? undefined : _a.remove());
             const listener = await BluetoothLe.addListener(key, (result) => {
                 callback(result.value);
             });
@@ -209,7 +219,7 @@ class BleClientClass {
         await this.queue(async () => {
             var _a;
             const key = `onEnabledChanged`;
-            await ((_a = this.eventListeners.get(key)) === null || _a === void 0 ? void 0 : _a.remove());
+            await ((_a = this.eventListeners.get(key)) === null || _a === undefined ? undefined : _a.remove());
             this.eventListeners.delete(key);
             await BluetoothLe.stopEnabledNotifications();
         });
@@ -253,7 +263,7 @@ class BleClientClass {
         options = this.validateRequestBleDeviceOptions(options);
         await this.queue(async () => {
             var _a;
-            await ((_a = this.scanListener) === null || _a === void 0 ? void 0 : _a.remove());
+            await ((_a = this.scanListener) === null || _a === undefined ? undefined : _a.remove());
             this.scanListener = await BluetoothLe.addListener('onScanResult', (resultInternal) => {
                 const result = Object.assign(Object.assign({}, resultInternal), { manufacturerData: this.convertObject(resultInternal.manufacturerData), serviceData: this.convertObject(resultInternal.serviceData), rawAdvertisement: resultInternal.rawAdvertisement
                         ? this.convertValue(resultInternal.rawAdvertisement)
@@ -266,7 +276,7 @@ class BleClientClass {
     async stopLEScan() {
         await this.queue(async () => {
             var _a;
-            await ((_a = this.scanListener) === null || _a === void 0 ? void 0 : _a.remove());
+            await ((_a = this.scanListener) === null || _a === undefined ? undefined : _a.remove());
             this.scanListener = null;
             await BluetoothLe.stopLEScan();
         });
@@ -290,12 +300,18 @@ class BleClientClass {
             return result.devices;
         });
     }
+    async getBondedDevices() {
+        return this.queue(async () => {
+            const result = await BluetoothLe.getBondedDevices();
+            return result.devices;
+        });
+    }
     async connect(deviceId, onDisconnect, options) {
         await this.queue(async () => {
             var _a;
             if (onDisconnect) {
                 const key = `disconnected|${deviceId}`;
-                await ((_a = this.eventListeners.get(key)) === null || _a === void 0 ? void 0 : _a.remove());
+                await ((_a = this.eventListeners.get(key)) === null || _a === undefined ? undefined : _a.remove());
                 const listener = await BluetoothLe.addListener(key, () => {
                     onDisconnect(deviceId);
                 });
@@ -367,7 +383,7 @@ class BleClientClass {
         service = parseUUID(service);
         characteristic = parseUUID(characteristic);
         return this.queue(async () => {
-            if (!(value === null || value === void 0 ? void 0 : value.buffer)) {
+            if (!(value === null || value === undefined ? undefined : value.buffer)) {
                 throw new Error('Invalid data.');
             }
             let writeValue = value;
@@ -384,7 +400,7 @@ class BleClientClass {
         service = parseUUID(service);
         characteristic = parseUUID(characteristic);
         await this.queue(async () => {
-            if (!(value === null || value === void 0 ? void 0 : value.buffer)) {
+            if (!(value === null || value === undefined ? undefined : value.buffer)) {
                 throw new Error('Invalid data.');
             }
             let writeValue = value;
@@ -415,7 +431,7 @@ class BleClientClass {
         characteristic = parseUUID(characteristic);
         descriptor = parseUUID(descriptor);
         return this.queue(async () => {
-            if (!(value === null || value === void 0 ? void 0 : value.buffer)) {
+            if (!(value === null || value === undefined ? undefined : value.buffer)) {
                 throw new Error('Invalid data.');
             }
             let writeValue = value;
@@ -435,9 +451,9 @@ class BleClientClass {
         await this.queue(async () => {
             var _a;
             const key = `notification|${deviceId}|${service}|${characteristic}`;
-            await ((_a = this.eventListeners.get(key)) === null || _a === void 0 ? void 0 : _a.remove());
+            await ((_a = this.eventListeners.get(key)) === null || _a === undefined ? undefined : _a.remove());
             const listener = await BluetoothLe.addListener(key, (event) => {
-                callback(this.convertValue(event === null || event === void 0 ? void 0 : event.value));
+                callback(this.convertValue(event === null || event === undefined ? undefined : event.value));
             });
             this.eventListeners.set(key, listener);
             await BluetoothLe.startNotifications({
@@ -453,7 +469,7 @@ class BleClientClass {
         await this.queue(async () => {
             var _a;
             const key = `notification|${deviceId}|${service}|${characteristic}`;
-            await ((_a = this.eventListeners.get(key)) === null || _a === void 0 ? void 0 : _a.remove());
+            await ((_a = this.eventListeners.get(key)) === null || _a === undefined ? undefined : _a.remove());
             this.eventListeners.delete(key);
             await BluetoothLe.stopNotifications({
                 deviceId,
@@ -561,7 +577,7 @@ class BluetoothLeWeb extends core.WebPlugin {
         const filters = this.getFilters(options);
         const device = await navigator.bluetooth.requestDevice({
             filters: filters.length ? filters : undefined,
-            optionalServices: options === null || options === void 0 ? void 0 : options.optionalServices,
+            optionalServices: options === null || options === undefined ? undefined : options.optionalServices,
             acceptAllDevices: filters.length === 0,
         });
         this.deviceMap.set(device.id, device);
@@ -578,7 +594,7 @@ class BluetoothLeWeb extends core.WebPlugin {
         this.scan = await navigator.bluetooth.requestLEScan({
             filters: filters.length ? filters : undefined,
             acceptAllAdvertisements: filters.length === 0,
-            keepRepeatedDevices: options === null || options === void 0 ? void 0 : options.allowDuplicates,
+            keepRepeatedDevices: options === null || options === undefined ? undefined : options.allowDuplicates,
         });
     }
     onAdvertisementReceived(event) {
@@ -586,7 +602,7 @@ class BluetoothLeWeb extends core.WebPlugin {
         const deviceId = event.device.id;
         this.deviceMap.set(deviceId, event.device);
         const isNew = !this.discoveredDevices.has(deviceId);
-        if (isNew || ((_a = this.requestBleDeviceOptions) === null || _a === void 0 ? void 0 : _a.allowDuplicates)) {
+        if (isNew || ((_a = this.requestBleDeviceOptions) === null || _a === undefined ? undefined : _a.allowDuplicates)) {
             this.discoveredDevices.set(deviceId, true);
             const device = this.getBleDevice(event.device);
             const result = {
@@ -596,14 +612,14 @@ class BluetoothLeWeb extends core.WebPlugin {
                 txPower: event.txPower,
                 manufacturerData: mapToObject(event.manufacturerData),
                 serviceData: mapToObject(event.serviceData),
-                uuids: (_b = event.uuids) === null || _b === void 0 ? void 0 : _b.map(webUUIDToString),
+                uuids: (_b = event.uuids) === null || _b === undefined ? undefined : _b.map(webUUIDToString),
             };
             this.notifyListeners('onScanResult', result);
         }
     }
     async stopLEScan() {
         var _a;
-        if ((_a = this.scan) === null || _a === void 0 ? void 0 : _a.active) {
+        if ((_a = this.scan) === null || _a === undefined ? undefined : _a.active) {
             this.scan.stop();
         }
         this.scan = null;
@@ -624,7 +640,7 @@ class BluetoothLeWeb extends core.WebPlugin {
         const bleDevices = devices
             .filter((device) => {
             var _a;
-            return (_a = device.gatt) === null || _a === void 0 ? void 0 : _a.connected;
+            return (_a = device.gatt) === null || _a === undefined ? undefined : _a.connected;
         })
             .map((device) => {
             this.deviceMap.set(device.id, device);
@@ -632,6 +648,9 @@ class BluetoothLeWeb extends core.WebPlugin {
             return bleDevice;
         });
         return { devices: bleDevices };
+    }
+    async getBondedDevices() {
+        return {};
     }
     async connect(options) {
         var _a, _b;
@@ -649,7 +668,7 @@ class BluetoothLeWeb extends core.WebPlugin {
         catch (error) {
             // cancel pending connect call, does not work yet in chromium because of a bug:
             // https://bugs.chromium.org/p/chromium/issues/detail?id=684073
-            await ((_b = device.gatt) === null || _b === void 0 ? void 0 : _b.disconnect());
+            await ((_b = device.gatt) === null || _b === undefined ? undefined : _b.disconnect());
             if (error === timeoutError) {
                 throw new Error('Connection timeout');
             }
@@ -671,11 +690,11 @@ class BluetoothLeWeb extends core.WebPlugin {
     }
     async disconnect(options) {
         var _a;
-        (_a = this.getDeviceFromMap(options.deviceId).gatt) === null || _a === void 0 ? void 0 : _a.disconnect();
+        (_a = this.getDeviceFromMap(options.deviceId).gatt) === null || _a === undefined ? undefined : _a.disconnect();
     }
     async getServices(options) {
         var _a, _b;
-        const services = (_b = (await ((_a = this.getDeviceFromMap(options.deviceId).gatt) === null || _a === void 0 ? void 0 : _a.getPrimaryServices()))) !== null && _b !== void 0 ? _b : [];
+        const services = (_b = (await ((_a = this.getDeviceFromMap(options.deviceId).gatt) === null || _a === undefined ? undefined : _a.getPrimaryServices()))) !== null && _b !== undefined ? _b : [];
         const bleServices = [];
         for (const service of services) {
             const characteristics = await service.getCharacteristics();
@@ -717,12 +736,12 @@ class BluetoothLeWeb extends core.WebPlugin {
     }
     async getCharacteristic(options) {
         var _a;
-        const service = await ((_a = this.getDeviceFromMap(options.deviceId).gatt) === null || _a === void 0 ? void 0 : _a.getPrimaryService(options === null || options === void 0 ? void 0 : options.service));
-        return service === null || service === void 0 ? void 0 : service.getCharacteristic(options === null || options === void 0 ? void 0 : options.characteristic);
+        const service = await ((_a = this.getDeviceFromMap(options.deviceId).gatt) === null || _a === undefined ? undefined : _a.getPrimaryService(options === null || options === undefined ? undefined : options.service));
+        return service === null || service === undefined ? undefined : service.getCharacteristic(options === null || options === undefined ? undefined : options.characteristic);
     }
     async getDescriptor(options) {
         const characteristic = await this.getCharacteristic(options);
-        return characteristic === null || characteristic === void 0 ? void 0 : characteristic.getDescriptor(options === null || options === void 0 ? void 0 : options.descriptor);
+        return characteristic === null || characteristic === undefined ? undefined : characteristic.getDescriptor(options === null || options === undefined ? undefined : options.descriptor);
     }
     async discoverServices(_options) {
         throw this.unavailable('discoverServices is not available on web.');
@@ -738,7 +757,7 @@ class BluetoothLeWeb extends core.WebPlugin {
     }
     async read(options) {
         const characteristic = await this.getCharacteristic(options);
-        const value = await (characteristic === null || characteristic === void 0 ? void 0 : characteristic.readValue());
+        const value = await (characteristic === null || characteristic === undefined ? undefined : characteristic.readValue());
         return { value };
     }
     async write(options) {
@@ -750,7 +769,7 @@ class BluetoothLeWeb extends core.WebPlugin {
         else {
             dataView = options.value;
         }
-        await (characteristic === null || characteristic === void 0 ? void 0 : characteristic.writeValueWithResponse(dataView));
+        await (characteristic === null || characteristic === undefined ? undefined : characteristic.writeValueWithResponse(dataView));
     }
     async writeWithoutResponse(options) {
         const characteristic = await this.getCharacteristic(options);
@@ -761,11 +780,11 @@ class BluetoothLeWeb extends core.WebPlugin {
         else {
             dataView = options.value;
         }
-        await (characteristic === null || characteristic === void 0 ? void 0 : characteristic.writeValueWithoutResponse(dataView));
+        await (characteristic === null || characteristic === undefined ? undefined : characteristic.writeValueWithoutResponse(dataView));
     }
     async readDescriptor(options) {
         const descriptor = await this.getDescriptor(options);
-        const value = await (descriptor === null || descriptor === void 0 ? void 0 : descriptor.readValue());
+        const value = await (descriptor === null || descriptor === undefined ? undefined : descriptor.readValue());
         return { value };
     }
     async writeDescriptor(options) {
@@ -777,37 +796,37 @@ class BluetoothLeWeb extends core.WebPlugin {
         else {
             dataView = options.value;
         }
-        await (descriptor === null || descriptor === void 0 ? void 0 : descriptor.writeValue(dataView));
+        await (descriptor === null || descriptor === undefined ? undefined : descriptor.writeValue(dataView));
     }
     async startNotifications(options) {
         const characteristic = await this.getCharacteristic(options);
-        characteristic === null || characteristic === void 0 ? void 0 : characteristic.removeEventListener('characteristicvaluechanged', this.onCharacteristicValueChangedCallback);
-        characteristic === null || characteristic === void 0 ? void 0 : characteristic.addEventListener('characteristicvaluechanged', this.onCharacteristicValueChangedCallback);
-        await (characteristic === null || characteristic === void 0 ? void 0 : characteristic.startNotifications());
+        characteristic === null || characteristic === undefined ? undefined : characteristic.removeEventListener('characteristicvaluechanged', this.onCharacteristicValueChangedCallback);
+        characteristic === null || characteristic === undefined ? undefined : characteristic.addEventListener('characteristicvaluechanged', this.onCharacteristicValueChangedCallback);
+        await (characteristic === null || characteristic === undefined ? undefined : characteristic.startNotifications());
     }
     onCharacteristicValueChanged(event) {
         var _a, _b;
         const characteristic = event.target;
-        const key = `notification|${(_a = characteristic.service) === null || _a === void 0 ? void 0 : _a.device.id}|${(_b = characteristic.service) === null || _b === void 0 ? void 0 : _b.uuid}|${characteristic.uuid}`;
+        const key = `notification|${(_a = characteristic.service) === null || _a === undefined ? undefined : _a.device.id}|${(_b = characteristic.service) === null || _b === undefined ? undefined : _b.uuid}|${characteristic.uuid}`;
         this.notifyListeners(key, {
             value: characteristic.value,
         });
     }
     async stopNotifications(options) {
         const characteristic = await this.getCharacteristic(options);
-        await (characteristic === null || characteristic === void 0 ? void 0 : characteristic.stopNotifications());
+        await (characteristic === null || characteristic === undefined ? undefined : characteristic.stopNotifications());
     }
     getFilters(options) {
         var _a;
         const filters = [];
-        for (const service of (_a = options === null || options === void 0 ? void 0 : options.services) !== null && _a !== void 0 ? _a : []) {
+        for (const service of (_a = options === null || options === undefined ? undefined : options.services) !== null && _a !== undefined ? _a : []) {
             filters.push({
                 services: [service],
-                name: options === null || options === void 0 ? void 0 : options.name,
-                namePrefix: options === null || options === void 0 ? void 0 : options.namePrefix,
+                name: options === null || options === undefined ? undefined : options.name,
+                namePrefix: options === null || options === undefined ? undefined : options.namePrefix,
             });
         }
-        if (((options === null || options === void 0 ? void 0 : options.name) || (options === null || options === void 0 ? void 0 : options.namePrefix)) && filters.length === 0) {
+        if (((options === null || options === undefined ? undefined : options.name) || (options === null || options === undefined ? undefined : options.namePrefix)) && filters.length === 0) {
             filters.push({
                 name: options.name,
                 namePrefix: options.namePrefix,
@@ -827,7 +846,7 @@ class BluetoothLeWeb extends core.WebPlugin {
         const bleDevice = {
             deviceId: device.id,
             // use undefined instead of null if name is not available
-            name: (_a = device.name) !== null && _a !== void 0 ? _a : undefined,
+            name: (_a = device.name) !== null && _a !== undefined ? _a : undefined,
         };
         return bleDevice;
     }
