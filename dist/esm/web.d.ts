@@ -1,5 +1,5 @@
 import { WebPlugin } from '@capacitor/core';
-import type { TimeoutOptions, BleDevice, BleServices, BluetoothLePlugin, BooleanResult, DeviceIdOptions, GetConnectedDevicesOptions, GetDevicesOptions, GetDevicesResult, ReadDescriptorOptions, ReadOptions, ReadResult, ReadRssiResult, RequestBleDeviceOptions, WriteOptions, WriteDescriptorOptions, GetMtuResult, RequestConnectionPriorityOptions } from './definitions';
+import type { ConnectOptions, BleDevice, BleServices, BluetoothLePlugin, BooleanResult, DeviceIdOptions, GetConnectedDevicesOptions, GetDevicesOptions, GetDevicesResult, ReadDescriptorOptions, ReadOptions, ReadResult, ReadRssiResult, RequestBleDeviceOptions, WriteOptions, WriteDescriptorOptions, GetMtuResult, RequestConnectionPriorityOptions } from './definitions';
 export declare class BluetoothLeWeb extends WebPlugin implements BluetoothLePlugin {
     private deviceMap;
     private discoveredDevices;
@@ -26,7 +26,7 @@ export declare class BluetoothLeWeb extends WebPlugin implements BluetoothLePlug
     getDevices(options: GetDevicesOptions): Promise<GetDevicesResult>;
     getConnectedDevices(_options: GetConnectedDevicesOptions): Promise<GetDevicesResult>;
     getBondedDevices(): Promise<GetDevicesResult>;
-    connect(options: DeviceIdOptions & TimeoutOptions): Promise<void>;
+    connect(options: ConnectOptions): Promise<void>;
     private onDisconnectedCallback;
     private onDisconnected;
     createBond(_options: DeviceIdOptions): Promise<void>;
@@ -51,6 +51,7 @@ export declare class BluetoothLeWeb extends WebPlugin implements BluetoothLePlug
     private onCharacteristicValueChanged;
     stopNotifications(options: ReadOptions): Promise<void>;
     private getFilters;
+    private matchesServiceDataFilter;
     private getDeviceFromMap;
     private getBleDevice;
 }

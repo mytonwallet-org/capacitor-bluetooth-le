@@ -32,3 +32,25 @@ export declare function webUUIDToString(uuid: string | number): string;
 export declare function mapToObject<V>(map?: Map<string | number, V>): {
     [key: string]: V;
 } | undefined;
+/**
+ * Convert Data or Uint8Array to Uint8Array.
+ * @param value DataView, Uint8Array, or undefined
+ * @return Uint8Array or undefined
+ */
+export declare function toUint8Array(value: DataView | Uint8Array | undefined): Uint8Array | undefined;
+/**
+ * Convert Data, Uint8Array, or string to hex string.
+ * @param value DataView, Uint8Array, or undefined
+ * @return hex string or undefined
+ */
+export declare function toHexString(value: DataView | Uint8Array | undefined): string | undefined;
+/**
+ * Convert a DataView to a DataView backed by an ArrayBuffer.
+ * If the DataView is backed by a SharedArrayBuffer, this creates a copy.
+ * Otherwise, returns the original DataView.
+ * @param value DataView to convert
+ * @return DataView backed by ArrayBuffer
+ */
+export declare function toArrayBufferDataView(value: DataView): DataView & {
+    buffer: ArrayBuffer;
+};

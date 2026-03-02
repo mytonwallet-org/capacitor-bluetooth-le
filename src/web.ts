@@ -1,12 +1,12 @@
 import { WebPlugin } from '@capacitor/core';
 
-import { hexStringToDataView, mapToObject, webUUIDToString } from './conversion';
+import { hexStringToDataView, mapToObject, toArrayBufferDataView, webUUIDToString } from './conversion';
 import type {
   BleCharacteristic,
   BleCharacteristicProperties,
   BleDescriptor,
   BleService,
-  TimeoutOptions,
+  ConnectOptions,
   BleDevice,
   BleServices,
   BluetoothLePlugin,
@@ -125,6 +125,12 @@ export class BluetoothLeWeb extends WebPlugin implements BluetoothLePlugin {
     const deviceId = event.device.id;
     this.deviceMap.set(deviceId, event.device);
     const isNew = !this.discoveredDevices.has(deviceId);
+
+    // Apply service data filtering client-side (Web Bluetooth API doesn't support it in scan filters)
+    if (this.requestBleDeviceOptions?.serviceData && !this.matchesServiceDataFilter(event)) {
+      return;
+    }
+
     if (isNew || this.requestBleDeviceOptions?.allowDuplicates) {
       this.discoveredDevices.set(deviceId, true);
       const device = this.getBleDevice(event.device);
@@ -178,7 +184,7 @@ export class BluetoothLeWeb extends WebPlugin implements BluetoothLePlugin {
     return {} as Promise<GetDevicesResult>;
   }
 
-  async connect(options: DeviceIdOptions & TimeoutOptions): Promise<void> {
+  async connect(options: ConnectOptions): Promise<void> {
     const device = this.getDeviceFromMap(options.deviceId);
     device.removeEventListener('gattserverdisconnected', this.onDisconnectedCallback);
     device.addEventListener('gattserverdisconnected', this.onDisconnectedCallback);
@@ -308,7 +314,7 @@ export class BluetoothLeWeb extends WebPlugin implements BluetoothLePlugin {
     } else {
       dataView = options.value;
     }
-    await characteristic?.writeValueWithResponse(dataView);
+    await characteristic?.writeValueWithResponse(toArrayBufferDataView(dataView));
   }
 
   async writeWithoutResponse(options: WriteOptions): Promise<void> {
@@ -319,7 +325,7 @@ export class BluetoothLeWeb extends WebPlugin implements BluetoothLePlugin {
     } else {
       dataView = options.value;
     }
-    await characteristic?.writeValueWithoutResponse(dataView);
+    await characteristic?.writeValueWithoutResponse(toArrayBufferDataView(dataView));
   }
 
   async readDescriptor(options: ReadDescriptorOptions): Promise<ReadResult> {
@@ -336,7 +342,7 @@ export class BluetoothLeWeb extends WebPlugin implements BluetoothLePlugin {
     } else {
       dataView = options.value;
     }
-    await descriptor?.writeValue(dataView);
+    await descriptor?.writeValue(toArrayBufferDataView(dataView));
   }
 
   async startNotifications(options: ReadOptions): Promise<void> {
@@ -376,7 +382,77 @@ export class BluetoothLeWeb extends WebPlugin implements BluetoothLePlugin {
         namePrefix: options.namePrefix,
       });
     }
+    for (const manufacturerData of options?.manufacturerData ?? []) {
+      // Cast to any to avoid type incompatibility - conversion is handled in bleClient.ts
+      filters.push({
+        manufacturerData: [manufacturerData as any],
+      });
+    }
+    // Note: Web Bluetooth API does not support service data in scan filters.
+    // Service data filtering will be done client-side in onAdvertisementReceived.
+    // We still accept serviceData in options for API consistency across platforms.
     return filters;
+  }
+
+  private matchesServiceDataFilter(event: BluetoothAdvertisingEvent): boolean {
+    const filters = this.requestBleDeviceOptions?.serviceData;
+    if (!filters || filters.length === 0) {
+      return true; // No filters, accept all
+    }
+
+    if (!event.serviceData) {
+      return false; // No service data in advertisement
+    }
+
+    // Check if any filter matches (OR logic)
+    for (const filter of filters) {
+      const serviceData = event.serviceData.get(filter.serviceUuid);
+      if (!serviceData) {
+        continue; // This filter doesn't match, try next
+      }
+
+      // If we have service data for this UUID
+      if (!filter.dataPrefix) {
+        return true; // Filter matched by service UUID alone
+      }
+
+      // Check data prefix (DataView on web)
+      const data = new Uint8Array(serviceData.buffer);
+      const prefixView = filter.dataPrefix as DataView;
+
+      if (data.length < prefixView.byteLength) {
+        continue; // Data too short
+      }
+
+      // Apply mask if provided
+      if (filter.mask) {
+        const maskView = filter.mask as DataView;
+        let matches = true;
+        for (let i = 0; i < prefixView.byteLength; i++) {
+          if ((data[i] & maskView.getUint8(i)) !== (prefixView.getUint8(i) & maskView.getUint8(i))) {
+            matches = false;
+            break;
+          }
+        }
+        if (matches) {
+          return true;
+        }
+      } else {
+        // Check if data starts with prefix
+        let matches = true;
+        for (let i = 0; i < prefixView.byteLength; i++) {
+          if (data[i] !== prefixView.getUint8(i)) {
+            matches = false;
+            break;
+          }
+        }
+        if (matches) {
+          return true;
+        }
+      }
+    }
+
+    return false; // No filter matched
   }
 
   private getDeviceFromMap(deviceId: string): BluetoothDevice {
