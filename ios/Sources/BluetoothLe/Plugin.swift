@@ -9,12 +9,50 @@ let DEFAULT_TIMEOUT: Double = 5
 
 fileprivate struct SharedBLEVariables {
   static var deviceManager: DeviceManager?
-  static var deviceMap = [String: Device]()
+  static let deviceMap = ThreadSafeDictionary<String, Device>()
   static var displayStrings = [String: String]()
 }
 
 @objc(BluetoothLe)
-public class BluetoothLe: CAPPlugin {
+public class BluetoothLe: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "BluetoothLe"
+    public let jsName = "BluetoothLe"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "initialize", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isEnabled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestEnable", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "enable", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "disable", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startEnabledNotifications", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopEnabledNotifications", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isLocationEnabled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openLocationSettings", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openBluetoothSettings", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openAppSettings", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setDisplayStrings", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestDevice", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestLEScan", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopLEScan", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getDevices", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "discoverServices", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getConnectedDevices", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "connect", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "createBond", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isBonded", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getBondedDevices", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "disconnect", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getServices", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getMtu", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestConnectionPriority", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "readRssi", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "read", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "write", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "writeWithoutResponse", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "readDescriptor", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "writeDescriptor", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startNotifications", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopNotifications", returnType: CAPPluginReturnPromise)
+    ]
     typealias BleDevice = [String: Any]
     typealias BleService = [String: Any]
     typealias BleCharacteristic = [String: Any]
@@ -103,8 +141,8 @@ public class BluetoothLe: CAPPlugin {
 
     @objc func setDisplayStrings(_ call: CAPPluginCall) {
         for key in ["noDeviceFound", "availableDevices", "scanning", "cancel"] {
-            if call.getString(key) != nil {
-                SharedBLEVariables.displayStrings[key] = call.getString(key)
+            if let value = call.getString(key) {
+                SharedBLEVariables.displayStrings[key] = value
             }
         }
         call.resolve()
@@ -117,29 +155,43 @@ public class BluetoothLe: CAPPlugin {
         let serviceUUIDs = self.getServiceUUIDs(call)
         let name = call.getString("name")
         let namePrefix = call.getString("namePrefix")
+        let manufacturerDataFilters = self.getManufacturerDataFilters(call)
+        let serviceDataFilters = self.getServiceDataFilters(call)
+
+        let displayModeString = (call.getString("displayMode") ?? "alert").lowercased()
+        guard ["alert", "list"].contains(displayModeString) else {
+            call.reject("Invalid displayMode '\(call.getString("displayMode") ?? "")'. Use 'alert' or 'list'.")
+            return
+        }
+        let deviceListMode: DeviceListMode = displayModeString == "list" ? .list : .alert
 
         deviceManager.startScanning(
             serviceUUIDs,
             name,
             namePrefix,
+            manufacturerDataFilters,
+            serviceDataFilters,
             false,
-            true,
-            30, {(success, message) -> Void in
-                // selected a device
+            deviceListMode,
+            30,
+            {(success, message) -> Void in
                 if success {
                     guard let device = deviceManager.getDevice(message) else {
                         call.reject("Device not found.")
                         return
                     }
-                    SharedBLEVariables.deviceMap[device.getId()] = device
-                    let bleDevice: BleDevice = self.getBleDevice(device)
+                    let storedDevice = SharedBLEVariables.deviceMap.getOrInsert(
+                        key: device.getId(),
+                        create: { device },
+                        update: { $0.updatePeripheral(device.getPeripheral()) }
+                    ).value
+                    let bleDevice: BleDevice = self.getBleDevice(storedDevice)
                     call.resolve(bleDevice)
                 } else {
                     call.reject(message)
                 }
-            }, {(_, _, _) -> Void in
-
-            }
+            },
+            { (_, _, _) -> Void in }
         )
     }
 
@@ -150,22 +202,31 @@ public class BluetoothLe: CAPPlugin {
         let name = call.getString("name")
         let namePrefix = call.getString("namePrefix")
         let allowDuplicates = call.getBool("allowDuplicates", false)
+        let manufacturerDataFilters = self.getManufacturerDataFilters(call)
+        let serviceDataFilters = self.getServiceDataFilters(call)
 
         deviceManager.startScanning(
             serviceUUIDs,
             name,
             namePrefix,
+            manufacturerDataFilters,
+            serviceDataFilters,
             allowDuplicates,
-            false,
-            nil, {(success, message) -> Void in
+            .none,
+            nil,
+            { (success, message) -> Void in
                 if success {
                     call.resolve()
                 } else {
                     call.reject(message)
                 }
-            }, {(device, advertisementData, rssi) -> Void in
-                SharedBLEVariables.deviceMap[device.getId()] = device
-                let data = self.getScanResult(device, advertisementData, rssi)
+            }, { (device, advertisementData, rssi) in
+                let storedDevice = SharedBLEVariables.deviceMap.getOrInsert(
+                    key: device.getId(),
+                    create: { device },
+                    update: { $0.updatePeripheral(device.getPeripheral()) }
+                ).value
+                let data = self.getScanResult(storedDevice, advertisementData, rssi)
                 self.notifyListeners("onScanResult", data: data)
             }
         )
@@ -189,11 +250,11 @@ public class BluetoothLe: CAPPlugin {
         let peripherals = deviceManager.getDevices(deviceUUIDs)
         let bleDevices: [BleDevice] = peripherals.map({peripheral in
             let deviceId = peripheral.identifier.uuidString
-            guard let device = SharedBLEVariables.deviceMap[deviceId] else {
-                let newDevice = Device(peripheral)
-                SharedBLEVariables.deviceMap[newDevice.getId()] = newDevice
-                return self.getBleDevice(newDevice)
-            }
+            let device = SharedBLEVariables.deviceMap.getOrInsert(
+                key: deviceId,
+                create: { Device(peripheral) },
+                update: { $0.updatePeripheral(peripheral) }
+            ).value
             return self.getBleDevice(device)
         })
         call.resolve(["devices": bleDevices])
@@ -211,11 +272,11 @@ public class BluetoothLe: CAPPlugin {
         let peripherals = deviceManager.getConnectedDevices(serviceUUIDs)
         let bleDevices: [BleDevice] = peripherals.map({peripheral in
             let deviceId = peripheral.identifier.uuidString
-            guard let device = SharedBLEVariables.deviceMap[deviceId] else {
-                let newDevice = Device(peripheral)
-                SharedBLEVariables.deviceMap[newDevice.getId()] = newDevice
-                return self.getBleDevice(newDevice)
-            }
+            let device = SharedBLEVariables.deviceMap.getOrInsert(
+                key: deviceId,
+                create: { Device(peripheral) },
+                update: { $0.updatePeripheral(peripheral) }
+            ).value
             return self.getBleDevice(device)
         })
         call.resolve(["devices": bleDevices])
@@ -225,11 +286,13 @@ public class BluetoothLe: CAPPlugin {
         guard self.getDeviceManager(call) != nil else { return }
         guard let device = self.getDevice(call, checkConnection: false) else { return }
         let timeout = self.getTimeout(call, defaultTimeout: CONNECTION_TIMEOUT)
-        device.setOnConnected(timeout, {(success, message) -> Void in
+        let skipDescriptorDiscovery = call.getBool("skipDescriptorDiscovery") ?? false
+        device.setOnConnected(timeout, skipDescriptorDiscovery, {(success, message) -> Void in
             if success {
                 // only resolve after service discovery
                 call.resolve()
             } else {
+                SharedBLEVariables.deviceManager?.cancelConnect(device)
                 call.reject(message)
             }
         })
@@ -528,6 +591,80 @@ public class BluetoothLe: CAPPlugin {
         return serviceUUIDs
     }
 
+    private func getManufacturerDataFilters(_ call: CAPPluginCall) -> [ManufacturerDataFilter]? {
+        guard let manufacturerDataArray = call.getArray("manufacturerData") else {
+            return nil
+        }
+
+        var manufacturerDataFilters: [ManufacturerDataFilter] = []
+
+        for index in 0..<manufacturerDataArray.count {
+            guard let dataObject = manufacturerDataArray[index] as? JSObject,
+                  let companyIdentifier = dataObject["companyIdentifier"] as? UInt16 else {
+                // Invalid or missing company identifier
+                return nil
+            }
+
+            let dataPrefix: Data? = {
+                guard let prefixString = dataObject["dataPrefix"] as? String else { return nil }
+                return stringToData(prefixString)
+            }()
+
+            let mask: Data? = {
+                guard let maskString = dataObject["mask"] as? String else { return nil }
+                return stringToData(maskString)
+            }()
+
+            let manufacturerFilter = ManufacturerDataFilter(
+                companyIdentifier: companyIdentifier,
+                dataPrefix: dataPrefix,
+                mask: mask
+            )
+
+            manufacturerDataFilters.append(manufacturerFilter)
+        }
+
+        return manufacturerDataFilters
+    }
+
+    private func getServiceDataFilters(_ call: CAPPluginCall) -> [ServiceDataFilter]? {
+        guard let serviceDataArray = call.getArray("serviceData") else {
+            return nil
+        }
+
+        var serviceDataFilters: [ServiceDataFilter] = []
+
+        for index in 0..<serviceDataArray.count {
+            guard let dataObject = serviceDataArray[index] as? JSObject,
+                  let serviceUuidString = dataObject["serviceUuid"] as? String else {
+                // Invalid or missing service UUID
+                return nil
+            }
+
+            let serviceUuid = CBUUID(string: serviceUuidString)
+
+            let dataPrefix: Data? = {
+                guard let prefixString = dataObject["dataPrefix"] as? String else { return nil }
+                return stringToData(prefixString)
+            }()
+
+            let mask: Data? = {
+                guard let maskString = dataObject["mask"] as? String else { return nil }
+                return stringToData(maskString)
+            }()
+
+            let serviceDataFilter = ServiceDataFilter(
+                serviceUuid: serviceUuid,
+                dataPrefix: dataPrefix,
+                mask: mask
+            )
+
+            serviceDataFilters.append(serviceDataFilter)
+        }
+
+        return serviceDataFilters
+    }
+
     private func getDevice(_ call: CAPPluginCall, checkConnection: Bool = true) -> Device? {
         guard let deviceId = call.getString("deviceId") else {
             call.reject("deviceId required.")
@@ -585,8 +722,8 @@ public class BluetoothLe: CAPPlugin {
         var bleDevice = [
             "deviceId": device.getId()
         ]
-        if device.getName() != nil {
-            bleDevice["name"] = device.getName()
+        if let name = device.getName() {
+            bleDevice["name"] = name
         }
         return bleDevice
     }
@@ -601,19 +738,16 @@ public class BluetoothLe: CAPPlugin {
             })
         ]
 
-        let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
-        if localName != nil {
+        if let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String {
             data["localName"] = localName
         }
 
-        let manufacturerData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data
-        if manufacturerData != nil {
-            data["manufacturerData"] = self.getManufacturerData(data: manufacturerData!)
+        if let manufacturerData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data {
+            data["manufacturerData"] = self.getManufacturerData(data: manufacturerData)
         }
 
-        let serviceData = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data]
-        if serviceData != nil {
-            data["serviceData"] = self.getServiceData(data: serviceData!)
+        if let serviceData = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data] {
+            data["serviceData"] = self.getServiceData(data: serviceData)
         }
         return data
     }

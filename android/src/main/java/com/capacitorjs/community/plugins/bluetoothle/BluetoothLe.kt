@@ -368,7 +368,8 @@ class BluetoothLe : Plugin() {
             displayStrings = displayStrings!!,
             showDialog = false,
         )
-        deviceScanner?.startScanning(scanFilters,
+        deviceScanner?.startScanning(
+            scanFilters,
             scanSettings,
             allowDuplicates,
             namePrefix,
@@ -462,7 +463,8 @@ class BluetoothLe : Plugin() {
     fun connect(call: PluginCall) {
         val device = getOrCreateDevice(call) ?: return
         val timeout = call.getFloat("timeout", CONNECTION_TIMEOUT)!!.toLong()
-        device.connect(timeout) { response ->
+        val skipDescriptorDiscovery = call.getBoolean("skipDescriptorDiscovery", false)!!
+        device.connect(timeout, skipDescriptorDiscovery) { response ->
             run {
                 if (response.success) {
                     call.resolve()
@@ -512,6 +514,7 @@ class BluetoothLe : Plugin() {
         device.disconnect(timeout) { response ->
             run {
                 if (response.success) {
+                    device.cleanup()
                     deviceMap.remove(device.getId())
                     call.resolve()
                 } else {
@@ -525,6 +528,7 @@ class BluetoothLe : Plugin() {
     fun getServices(call: PluginCall) {
         val device = getDevice(call) ?: return
         val services = device.getServices()
+        val skipDescriptorDiscovery = device.getSkipDescriptorDiscovery()
         val bleServices = JSArray()
         services.forEach { service ->
             val bleCharacteristics = JSArray()
@@ -533,10 +537,12 @@ class BluetoothLe : Plugin() {
                 bleCharacteristic.put("uuid", characteristic.uuid)
                 bleCharacteristic.put("properties", getProperties(characteristic))
                 val bleDescriptors = JSArray()
-                characteristic.descriptors.forEach { descriptor ->
-                    val bleDescriptor = JSObject()
-                    bleDescriptor.put("uuid", descriptor.uuid)
-                    bleDescriptors.put(bleDescriptor)
+                if (!skipDescriptorDiscovery) {
+                    characteristic.descriptors.forEach { descriptor ->
+                        val bleDescriptor = JSObject()
+                        bleDescriptor.put("uuid", descriptor.uuid)
+                        bleDescriptors.put(bleDescriptor)
+                    }
                 }
                 bleCharacteristic.put("descriptors", bleDescriptors)
                 bleCharacteristics.put(bleCharacteristic)
@@ -756,6 +762,7 @@ class BluetoothLe : Plugin() {
     fun startNotifications(call: PluginCall) {
         val device = getDevice(call) ?: return
         val characteristic = getCharacteristic(call) ?: return
+        val timeout = call.getFloat("timeout", DEFAULT_TIMEOUT)!!.toLong()
         device.setNotifications(characteristic.first, characteristic.second, true, { response ->
             run {
                 val key =
@@ -768,7 +775,7 @@ class BluetoothLe : Plugin() {
                     Logger.error(TAG, "Error in notifyListeners: ${e.localizedMessage}", e)
                 }
             }
-        }, { response ->
+        }, timeout, { response ->
             run {
                 if (response.success) {
                     call.resolve()
@@ -783,8 +790,9 @@ class BluetoothLe : Plugin() {
     fun stopNotifications(call: PluginCall) {
         val device = getDevice(call) ?: return
         val characteristic = getCharacteristic(call) ?: return
+        val timeout = call.getFloat("timeout", DEFAULT_TIMEOUT)!!.toLong()
         device.setNotifications(
-            characteristic.first, characteristic.second, false, null
+            characteristic.first, characteristic.second, false, null, timeout
         ) { response ->
             run {
                 if (response.success) {
@@ -808,8 +816,12 @@ class BluetoothLe : Plugin() {
         val filters: ArrayList<ScanFilter> = ArrayList()
 
         val services = (call.getArray("services", JSArray()) as JSArray).toList<String>()
+        val manufacturerDataArray = call.getArray("manufacturerData", JSArray())
+        val serviceDataArray = call.getArray("serviceData", JSArray())
         val name = call.getString("name", null)
+
         try {
+            // Create filters based on services
             for (service in services) {
                 val filter = ScanFilter.Builder()
                 filter.setServiceUuid(ParcelUuid.fromString(service))
@@ -818,18 +830,95 @@ class BluetoothLe : Plugin() {
                 }
                 filters.add(filter.build())
             }
+
+            // Service Data Handling (for filtering by service data like OpenDroneID)
+            serviceDataArray?.let {
+                for (i in 0 until it.length()) {
+                    val serviceDataObject = it.getJSONObject(i)
+
+                    val serviceUuid = serviceDataObject.getString("serviceUuid")
+                    val servicePuuid = ParcelUuid.fromString(serviceUuid)
+
+                    val dataPrefix = if (serviceDataObject.has("dataPrefix")) {
+                        val dataPrefixString = serviceDataObject.getString("dataPrefix")
+                        stringToBytes(dataPrefixString)
+                    } else null
+
+                    val mask = if (serviceDataObject.has("mask")) {
+                        val maskString = serviceDataObject.getString("mask")
+                        stringToBytes(maskString)
+                    } else null
+
+                    val filterBuilder = ScanFilter.Builder()
+
+                    if (dataPrefix != null && mask != null) {
+                        filterBuilder.setServiceData(servicePuuid, dataPrefix, mask)
+                    } else if (dataPrefix != null) {
+                        filterBuilder.setServiceData(servicePuuid, dataPrefix)
+                    } else {
+                        // Set service data filter without data (just match the service UUID)
+                        filterBuilder.setServiceData(servicePuuid, byteArrayOf())
+                    }
+
+                    if (name != null) {
+                        filterBuilder.setDeviceName(name)
+                    }
+
+                    filters.add(filterBuilder.build())
+                }
+            }
+
+            // Manufacturer Data Handling (with optional parameters)
+            manufacturerDataArray?.let {
+                for (i in 0 until it.length()) {
+                    val manufacturerDataObject = it.getJSONObject(i)
+
+                    val companyIdentifier = manufacturerDataObject.getInt("companyIdentifier")
+
+                    val dataPrefix = if (manufacturerDataObject.has("dataPrefix")) {
+                        val dataPrefixString = manufacturerDataObject.getString("dataPrefix")
+                        stringToBytes(dataPrefixString)
+                    } else null
+
+                    val mask = if (manufacturerDataObject.has("mask")) {
+                        val maskString = manufacturerDataObject.getString("mask")
+                        stringToBytes(maskString)
+                    } else null
+
+                    val filterBuilder = ScanFilter.Builder()
+
+                    if (dataPrefix != null && mask != null) {
+                        filterBuilder.setManufacturerData(companyIdentifier, dataPrefix, mask)
+                    } else if (dataPrefix != null) {
+                        filterBuilder.setManufacturerData(companyIdentifier, dataPrefix)
+                    } else {
+                        // Android requires at least dataPrefix for manufacturer filters.
+                        call.reject("dataPrefix is required when specifying manufacturerData.")
+                        return null
+                    }
+
+                    if (name != null) {
+                        filterBuilder.setDeviceName(name)
+                    }
+
+                    filters.add(filterBuilder.build())
+                }
+            }
+            // Create filters when providing only name
+            if (name != null && filters.isEmpty()) {
+                val filterBuilder = ScanFilter.Builder()
+                filterBuilder.setDeviceName(name)
+                filters.add(filterBuilder.build())
+            }
+
+            return filters;
         } catch (e: IllegalArgumentException) {
-            call.reject("Invalid service UUID.")
+            call.reject("Invalid UUID or Manufacturer data provided.")
+            return null
+        } catch (e: Exception) {
+            call.reject("Invalid or malformed filter data provided.")
             return null
         }
-
-        if (name != null && filters.isEmpty()) {
-            val filter = ScanFilter.Builder()
-            filter.setDeviceName(name)
-            filters.add(filter.build())
-        }
-
-        return filters
     }
 
     private fun getScanSettings(call: PluginCall): ScanSettings? {

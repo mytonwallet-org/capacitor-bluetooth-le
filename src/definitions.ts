@@ -46,6 +46,24 @@ export interface RequestBleDeviceOptions {
    * Android scan mode (default: ScanMode.SCAN_MODE_BALANCED)
    */
   scanMode?: ScanMode;
+  /**
+   * Allow scanning for devices with a specific manufacturer data
+   * https://developer.mozilla.org/en-US/docs/Web/API/Bluetooth/requestDevice#manufacturerdata
+   */
+  manufacturerData?: ManufacturerDataFilter[];
+  /**
+   * Display mode for the device list in `requestDevice` (**iOS** only).
+   * - `"alert"`: Classic alert dialog (default)
+   * - `"list"`: Scrollable list view
+   * @default "alert"
+   */
+  displayMode?: 'alert' | 'list';
+  /**
+   * Allow scanning for devices with specific service data.
+   * Service data is data associated with a specific service UUID in the advertisement packet.
+   * Useful for protocols like OpenDroneID, EddyStone, and Open Beacon.
+   */
+  serviceData?: ServiceDataFilter[];
 }
 
 /**
@@ -90,6 +108,54 @@ export enum ConnectionPriority {
   CONNECTION_PRIORITY_LOW_POWER = 2,
 }
 
+export interface ManufacturerDataFilter {
+  /**
+   * Company ID (sometimes called the manufacturer ID) to search for in the manufacturer data field.
+   */
+  companyIdentifier: number;
+
+  /**
+   * Prefix to match in the manufacturer data field.
+   * On **Android** this field is mandatory.
+   * android, ios: DataView
+   * web: Uint8Array
+   */
+  dataPrefix?: DataView | Uint8Array;
+
+  /**
+   * Set filter on partial manufacture data. For any bit in the mask, set it the 1 if it needs to match the one in manufacturer data, otherwise set it to 0.
+   * The `mask` must have the same length of dataPrefix.
+   * android, ios: DataView
+   * web: Uint8Array
+   */
+  mask?: DataView | Uint8Array;
+}
+
+export interface ServiceDataFilter {
+  /**
+   * Service UUID to filter by. The service data must be associated with this UUID.
+   * UUIDs have to be specified as 128 bit UUID strings,
+   * e.g. '0000fffa-0000-1000-8000-00805f9b34fb'
+   */
+  serviceUuid: string;
+
+  /**
+   * Prefix to match in the service data field.
+   * For example, OpenDroneID uses [0x0D] as the advertisement code.
+   * android, ios: string
+   * web: DataView
+   */
+  dataPrefix?: DataView;
+
+  /**
+   * Set filter on partial service data. For any bit in the mask, set it to 1 if it needs to match the one in service data, otherwise set it to 0.
+   * The `mask` must have the same length as dataPrefix.
+   * android, ios: string
+   * web: DataView
+   */
+  mask?: DataView;
+}
+
 export interface BleDevice {
   /**
    * ID of the device, which will be needed for further calls.
@@ -114,6 +180,17 @@ export interface TimeoutOptions {
    */
   timeout?: number;
 }
+
+export interface ConnectClientOptions extends TimeoutOptions {
+  /**
+   * Skip descriptor discovery during connection to improve connection speed.
+   * When enabled, descriptors will not be available in the services structure.
+   * @default false
+   */
+  skipDescriptorDiscovery?: boolean;
+}
+
+export interface ConnectOptions extends DeviceIdOptions, ConnectClientOptions {}
 
 export interface RequestConnectionPriorityOptions extends DeviceIdOptions {
   connectionPriority: ConnectionPriority;
@@ -299,7 +376,7 @@ export interface BluetoothLePlugin {
     eventName: 'onScanResult',
     listenerFunc: (result: ScanResultInternal) => void,
   ): Promise<PluginListenerHandle>;
-  connect(options: DeviceIdOptions & TimeoutOptions): Promise<void>;
+  connect(options: ConnectOptions): Promise<void>;
   createBond(options: DeviceIdOptions & TimeoutOptions): Promise<void>;
   isBonded(options: DeviceIdOptions): Promise<BooleanResult>;
   disconnect(options: DeviceIdOptions): Promise<void>;
@@ -313,6 +390,6 @@ export interface BluetoothLePlugin {
   writeWithoutResponse(options: WriteOptions & TimeoutOptions): Promise<void>;
   readDescriptor(options: ReadDescriptorOptions & TimeoutOptions): Promise<ReadResult>;
   writeDescriptor(options: WriteDescriptorOptions & TimeoutOptions): Promise<void>;
-  startNotifications(options: ReadOptions): Promise<void>;
+  startNotifications(options: ReadOptions & TimeoutOptions): Promise<void>;
   stopNotifications(options: ReadOptions): Promise<void>;
 }

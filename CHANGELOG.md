@@ -2,6 +2,110 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [8.1.0](https://github.com/capacitor-community/bluetooth-le/compare/v8.0.3...v8.1.0) (2026-02-04)
+
+
+### Features
+
+* add skipDescriptorDiscovery option to ConnectOptions ([f0e10c4](https://github.com/capacitor-community/bluetooth-le/commit/f0e10c4b7290a682a572d2fde0b583c1b05647a5))
+
+
+### Bug Fixes
+
+* check SharedArrayBuffer is defined before instanceof ([5282764](https://github.com/capacitor-community/bluetooth-le/commit/5282764c2b0904769b06f80790771228234eb9bd)), closes [#807](https://github.com/capacitor-community/bluetooth-le/issues/807)
+* **ios:** Disconnect from peripheral if service discovery fails during connect [#803](https://github.com/capacitor-community/bluetooth-le/issues/803) ([cf87930](https://github.com/capacitor-community/bluetooth-le/commit/cf87930e9b3aaa72fc117d7f74e816ddf622897f))
+
+### [8.0.3](https://github.com/capacitor-community/bluetooth-le/compare/v8.0.2...v8.0.3) (2026-02-02)
+
+
+### Bug Fixes
+
+* Avoid mutating scan options object ([#799](https://github.com/capacitor-community/bluetooth-le/issues/799), [#803](https://github.com/capacitor-community/bluetooth-le/issues/803)) ([3134a26](https://github.com/capacitor-community/bluetooth-le/commit/3134a26879af3ef4716d02673b5e002a469a1b86))
+
+### [8.0.2](https://github.com/capacitor-community/bluetooth-le/compare/v8.0.1...v8.0.2) (2026-01-31)
+
+
+### Bug Fixes
+
+* **ios:** Avoid "ghost" peripherals on iOS ([2c75ff4](https://github.com/capacitor-community/bluetooth-le/commit/2c75ff475380c2b7bab625387de8fdf1ba21e923))
+* **ios:** Change deviceMap to use ThreadSafeDictionary ([3fa8a9e](https://github.com/capacitor-community/bluetooth-le/commit/3fa8a9e7f077d70aef598e1303a4bd3dc86b303e))
+* **ios:** Improve thread-safety on iOS ([#779](https://github.com/capacitor-community/bluetooth-le/issues/779)) ([9bb35ad](https://github.com/capacitor-community/bluetooth-le/commit/9bb35ad0fcb2f2da3467dbab26372de121cc8213))
+
+### [8.0.1](https://github.com/capacitor-community/bluetooth-le/compare/v8.0.0...v8.0.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* **ios:** Use proper indices when comparing payload in manufacturer data ([#797](https://github.com/capacitor-community/bluetooth-le/issues/797)) ([e68926b](https://github.com/capacitor-community/bluetooth-le/commit/e68926bd4ab53ad012897370b71fb4f3e53ebe8c))
+
+## [8.0.0](https://github.com/capacitor-community/bluetooth-le/compare/v7.3.0...v8.0.0) (2026-01-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* convert iOS plugin to SPM
+* update plugin to capacitor 8
+
+### Features
+
+* convert iOS plugin to SPM ([b63068f](https://github.com/capacitor-community/bluetooth-le/commit/b63068fbdf1f811b4ba96de2ad34353f4ad07b5a))
+* update plugin to capacitor 8 ([26f2155](https://github.com/capacitor-community/bluetooth-le/commit/26f2155d9fbaf0d883d2129d3d5c584b3abb1c7d))
+
+### [7.3.2](https://github.com/capacitor-community/bluetooth-le/compare/v7.3.1...v7.3.2) (2026-02-02)
+
+
+### Bug Fixes
+
+* Avoid mutating scan options object ([#799](https://github.com/capacitor-community/bluetooth-le/issues/799), [#803](https://github.com/capacitor-community/bluetooth-le/issues/803)) ([6232eac](https://github.com/capacitor-community/bluetooth-le/commit/6232eac5ad043f403b33bc470653922aa5834096))
+
+### [7.3.1](https://github.com/capacitor-community/bluetooth-le/compare/v7.3.0...v7.3.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* **ios:** Use proper indices when comparing payload in manufacturer data ([#797](https://github.com/capacitor-community/bluetooth-le/issues/797)) ([d42b408](https://github.com/capacitor-community/bluetooth-le/commit/d42b408c2f3ec2d3b3f73db7e434d6da0442af34))
+
+## [7.3.0](https://github.com/capacitor-community/bluetooth-le/compare/v7.2.0...v7.3.0) (2025-12-06)
+
+
+### Features
+
+* add service data filtering support for BLE scanning ([b74846e](https://github.com/capacitor-community/bluetooth-le/commit/b74846ec79b125fdf0e4a368e79412830e5a2cb7))
+* improve iOS detected devices view ([215039b](https://github.com/capacitor-community/bluetooth-le/commit/215039b7718956819ea938451bdd7a8392e58611))
+
+
+### Bug Fixes
+
+* **android:** Improve thread safety related to bond handling ([e60d856](https://github.com/capacitor-community/bluetooth-le/commit/e60d856589e693b382b02896addfdf1a1278e12c))
+* **iOS:** correctly parse manufacturerData filters ([a6908eb](https://github.com/capacitor-community/bluetooth-le/commit/a6908eb664c435d16899f613301414830c2a230d))
+
+## [7.2.0](https://github.com/capacitor-community/bluetooth-le/compare/v7.1.1...v7.2.0) (2025-09-04)
+
+
+### Features
+
+* abort startNotifications on Android when bonding is cancelled ([a064cf0](https://github.com/capacitor-community/bluetooth-le/commit/a064cf0ccedfec0fff13458a4cde504c7939939b))
+* unify and expose timeout for startNotifications ([0c47df2](https://github.com/capacitor-community/bluetooth-le/commit/0c47df2d4b51a25ee025472eb69ace446aa44759))
+
+### [7.1.1](https://github.com/capacitor-community/bluetooth-le/compare/v7.1.0...v7.1.1) (2025-05-16)
+
+
+### Bug Fixes
+
+* **filters:** restore filtering only with name functionality ([#763](https://github.com/capacitor-community/bluetooth-le/issues/763)) ([cbab0c2](https://github.com/capacitor-community/bluetooth-le/commit/cbab0c2e4249f49de4ecec4d4d81caccefd1bce9))
+
+## [7.1.0](https://github.com/capacitor-community/bluetooth-le/compare/v7.0.0...v7.1.0) (2025-05-07)
+
+
+### Features
+
+* **all:** support to pass manufacturerData to the scan filters ([#752](https://github.com/capacitor-community/bluetooth-le/issues/752)) ([c56b670](https://github.com/capacitor-community/bluetooth-le/commit/c56b6709c42133d56ff7a6b96fdd8fed16253b12))
+
+
+### Bug Fixes
+
+* remove callback from map before invocation ([06eab26](https://github.com/capacitor-community/bluetooth-le/commit/06eab2606ab6c2dd08f16fe4022f2c5670b6f47a)), closes [#751](https://github.com/capacitor-community/bluetooth-le/issues/751)
+
 ## [7.0.0](https://github.com/capacitor-community/bluetooth-le/compare/v6.1.0...v7.0.0) (2025-01-25)
 
 

@@ -2,11 +2,12 @@ import type { PluginListenerHandle } from '@capacitor/core';
 import { Capacitor } from '@capacitor/core';
 
 import type { DisplayStrings } from './config';
-import { dataViewToHexString, hexStringToDataView } from './conversion';
+import { dataViewToHexString, hexStringToDataView, toUint8Array, toHexString } from './conversion';
 import type {
   BleDevice,
   BleService,
   ConnectionPriority,
+  ConnectClientOptions,
   Data,
   InitializeOptions,
   ReadResult,
@@ -151,7 +152,7 @@ export interface BleClientInterface {
    * @param onDisconnect Optional disconnect callback function that will be used when the device disconnects
    * @param options Options for plugin call
    */
-  connect(deviceId: string, onDisconnect?: (deviceId: string) => void, options?: TimeoutOptions): Promise<void>;
+  connect(deviceId: string, onDisconnect?: (deviceId: string) => void, options?: ConnectClientOptions): Promise<void>;
 
   /**
    * Create a bond with a peripheral BLE device.
@@ -295,12 +296,14 @@ export interface BleClientInterface {
    * @param service UUID of the service (see [UUID format](#uuid-format))
    * @param characteristic UUID of the characteristic (see [UUID format](#uuid-format))
    * @param callback Callback function to use when the value of the characteristic changes
+   * @param options Options for plugin call. Timeout not supported on **web**.
    */
   startNotifications(
     deviceId: string,
     service: string,
     characteristic: string,
     callback: (value: DataView) => void,
+    options?: TimeoutOptions,
   ): Promise<void>;
 
   /**
@@ -474,7 +477,11 @@ class BleClientClass implements BleClientInterface {
     });
   }
 
-  async connect(deviceId: string, onDisconnect?: (deviceId: string) => void, options?: TimeoutOptions): Promise<void> {
+  async connect(
+    deviceId: string,
+    onDisconnect?: (deviceId: string) => void,
+    options?: ConnectClientOptions,
+  ): Promise<void> {
     await this.queue(async () => {
       if (onDisconnect) {
         const key = `disconnected|${deviceId}`;
@@ -674,6 +681,7 @@ class BleClientClass implements BleClientInterface {
     service: string,
     characteristic: string,
     callback: (value: DataView) => void,
+    options?: TimeoutOptions,
   ): Promise<void> {
     service = parseUUID(service);
     characteristic = parseUUID(characteristic);
@@ -688,6 +696,7 @@ class BleClientClass implements BleClientInterface {
         deviceId,
         service,
         characteristic,
+        ...options,
       });
     });
   }
@@ -708,11 +717,38 @@ class BleClientClass implements BleClientInterface {
   }
 
   private validateRequestBleDeviceOptions(options: RequestBleDeviceOptions): RequestBleDeviceOptions {
+    options = { ...options };
     if (options.services) {
       options.services = options.services.map(parseUUID);
     }
     if (options.optionalServices) {
       options.optionalServices = options.optionalServices.map(parseUUID);
+    }
+    if (options.serviceData && Capacitor.getPlatform() !== 'web') {
+      // Native platforms: convert to hex strings
+      options.serviceData = options.serviceData.map((filter) => ({
+        ...filter,
+        serviceUuid: parseUUID(filter.serviceUuid),
+        dataPrefix: toHexString(filter.dataPrefix),
+        mask: toHexString(filter.mask),
+      })) as any;
+    }
+    if (options.manufacturerData) {
+      if (Capacitor.getPlatform() !== 'web') {
+        // Native platforms: convert to hex strings
+        options.manufacturerData = options.manufacturerData.map((filter) => ({
+          ...filter,
+          dataPrefix: toHexString(filter.dataPrefix),
+          mask: toHexString(filter.mask),
+        })) as any;
+      } else {
+        // Web platform: convert to Uint8Array for Web Bluetooth API
+        options.manufacturerData = options.manufacturerData.map((filter) => ({
+          ...filter,
+          dataPrefix: toUint8Array(filter.dataPrefix),
+          mask: toUint8Array(filter.mask),
+        }));
+      }
     }
     return options;
   }

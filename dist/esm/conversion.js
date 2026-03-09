@@ -82,4 +82,54 @@ export function mapToObject(map) {
     });
     return obj;
 }
+/**
+ * Convert Data or Uint8Array to Uint8Array.
+ * @param value DataView, Uint8Array, or undefined
+ * @return Uint8Array or undefined
+ */
+export function toUint8Array(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+    if (typeof value === 'string') {
+        const dataView = hexStringToDataView(value);
+        return new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+    }
+    if (value instanceof DataView) {
+        return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    }
+    return value; // Already Uint8Array
+}
+/**
+ * Convert Data, Uint8Array, or string to hex string.
+ * @param value DataView, Uint8Array, or undefined
+ * @return hex string or undefined
+ */
+export function toHexString(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+    if (value instanceof DataView) {
+        return dataViewToHexString(value);
+    }
+    // Uint8Array
+    return dataViewToHexString(new DataView(value.buffer, value.byteOffset, value.byteLength));
+}
+/**
+ * Convert a DataView to a DataView backed by an ArrayBuffer.
+ * If the DataView is backed by a SharedArrayBuffer, this creates a copy.
+ * Otherwise, returns the original DataView.
+ * @param value DataView to convert
+ * @return DataView backed by ArrayBuffer
+ */
+export function toArrayBufferDataView(value) {
+    if (typeof SharedArrayBuffer !== 'undefined' && value.buffer instanceof SharedArrayBuffer) {
+        // Need to copy to a regular ArrayBuffer
+        const uint8Array = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        const buffer = uint8Array.slice().buffer;
+        return new DataView(buffer);
+    }
+    // Already an ArrayBuffer, use directly
+    return value;
+}
 //# sourceMappingURL=conversion.js.map

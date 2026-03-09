@@ -1,5 +1,5 @@
 import { WebPlugin } from '@capacitor/core';
-import { hexStringToDataView, mapToObject, webUUIDToString } from './conversion';
+import { hexStringToDataView, mapToObject, toArrayBufferDataView, webUUIDToString } from './conversion';
 import { runWithTimeout } from './timeout';
 export class BluetoothLeWeb extends WebPlugin {
     constructor() {
@@ -80,11 +80,15 @@ export class BluetoothLeWeb extends WebPlugin {
         });
     }
     onAdvertisementReceived(event) {
-        var _a, _b;
+        var _a, _b, _c;
         const deviceId = event.device.id;
         this.deviceMap.set(deviceId, event.device);
         const isNew = !this.discoveredDevices.has(deviceId);
-        if (isNew || ((_a = this.requestBleDeviceOptions) === null || _a === void 0 ? void 0 : _a.allowDuplicates)) {
+        // Apply service data filtering client-side (Web Bluetooth API doesn't support it in scan filters)
+        if (((_a = this.requestBleDeviceOptions) === null || _a === void 0 ? void 0 : _a.serviceData) && !this.matchesServiceDataFilter(event)) {
+            return;
+        }
+        if (isNew || ((_b = this.requestBleDeviceOptions) === null || _b === void 0 ? void 0 : _b.allowDuplicates)) {
             this.discoveredDevices.set(deviceId, true);
             const device = this.getBleDevice(event.device);
             const result = {
@@ -94,7 +98,7 @@ export class BluetoothLeWeb extends WebPlugin {
                 txPower: event.txPower,
                 manufacturerData: mapToObject(event.manufacturerData),
                 serviceData: mapToObject(event.serviceData),
-                uuids: (_b = event.uuids) === null || _b === void 0 ? void 0 : _b.map(webUUIDToString),
+                uuids: (_c = event.uuids) === null || _c === void 0 ? void 0 : _c.map(webUUIDToString),
             };
             this.notifyListeners('onScanResult', result);
         }
@@ -251,7 +255,7 @@ export class BluetoothLeWeb extends WebPlugin {
         else {
             dataView = options.value;
         }
-        await (characteristic === null || characteristic === void 0 ? void 0 : characteristic.writeValueWithResponse(dataView));
+        await (characteristic === null || characteristic === void 0 ? void 0 : characteristic.writeValueWithResponse(toArrayBufferDataView(dataView)));
     }
     async writeWithoutResponse(options) {
         const characteristic = await this.getCharacteristic(options);
@@ -262,7 +266,7 @@ export class BluetoothLeWeb extends WebPlugin {
         else {
             dataView = options.value;
         }
-        await (characteristic === null || characteristic === void 0 ? void 0 : characteristic.writeValueWithoutResponse(dataView));
+        await (characteristic === null || characteristic === void 0 ? void 0 : characteristic.writeValueWithoutResponse(toArrayBufferDataView(dataView)));
     }
     async readDescriptor(options) {
         const descriptor = await this.getDescriptor(options);
@@ -278,7 +282,7 @@ export class BluetoothLeWeb extends WebPlugin {
         else {
             dataView = options.value;
         }
-        await (descriptor === null || descriptor === void 0 ? void 0 : descriptor.writeValue(dataView));
+        await (descriptor === null || descriptor === void 0 ? void 0 : descriptor.writeValue(toArrayBufferDataView(dataView)));
     }
     async startNotifications(options) {
         const characteristic = await this.getCharacteristic(options);
@@ -299,7 +303,7 @@ export class BluetoothLeWeb extends WebPlugin {
         await (characteristic === null || characteristic === void 0 ? void 0 : characteristic.stopNotifications());
     }
     getFilters(options) {
-        var _a;
+        var _a, _b;
         const filters = [];
         for (const service of (_a = options === null || options === void 0 ? void 0 : options.services) !== null && _a !== void 0 ? _a : []) {
             filters.push({
@@ -314,7 +318,71 @@ export class BluetoothLeWeb extends WebPlugin {
                 namePrefix: options.namePrefix,
             });
         }
+        for (const manufacturerData of (_b = options === null || options === void 0 ? void 0 : options.manufacturerData) !== null && _b !== void 0 ? _b : []) {
+            // Cast to any to avoid type incompatibility - conversion is handled in bleClient.ts
+            filters.push({
+                manufacturerData: [manufacturerData],
+            });
+        }
+        // Note: Web Bluetooth API does not support service data in scan filters.
+        // Service data filtering will be done client-side in onAdvertisementReceived.
+        // We still accept serviceData in options for API consistency across platforms.
         return filters;
+    }
+    matchesServiceDataFilter(event) {
+        var _a;
+        const filters = (_a = this.requestBleDeviceOptions) === null || _a === void 0 ? void 0 : _a.serviceData;
+        if (!filters || filters.length === 0) {
+            return true; // No filters, accept all
+        }
+        if (!event.serviceData) {
+            return false; // No service data in advertisement
+        }
+        // Check if any filter matches (OR logic)
+        for (const filter of filters) {
+            const serviceData = event.serviceData.get(filter.serviceUuid);
+            if (!serviceData) {
+                continue; // This filter doesn't match, try next
+            }
+            // If we have service data for this UUID
+            if (!filter.dataPrefix) {
+                return true; // Filter matched by service UUID alone
+            }
+            // Check data prefix (DataView on web)
+            const data = new Uint8Array(serviceData.buffer);
+            const prefixView = filter.dataPrefix;
+            if (data.length < prefixView.byteLength) {
+                continue; // Data too short
+            }
+            // Apply mask if provided
+            if (filter.mask) {
+                const maskView = filter.mask;
+                let matches = true;
+                for (let i = 0; i < prefixView.byteLength; i++) {
+                    if ((data[i] & maskView.getUint8(i)) !== (prefixView.getUint8(i) & maskView.getUint8(i))) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (matches) {
+                    return true;
+                }
+            }
+            else {
+                // Check if data starts with prefix
+                let matches = true;
+                for (let i = 0; i < prefixView.byteLength; i++) {
+                    if (data[i] !== prefixView.getUint8(i)) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (matches) {
+                    return true;
+                }
+            }
+        }
+        return false; // No filter matched
     }
     getDeviceFromMap(deviceId) {
         const device = this.deviceMap.get(deviceId);
